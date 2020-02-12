@@ -104,11 +104,18 @@ def create_train(df,feat_cols):
   #neutral sites
   train['at_home_x'] = np.where((train['at_home_x'].copy()==0)&(train['at_home_y'].copy()==0), 0.5, train['at_home_x'].copy())
 
+  train_tot = train
   train['target'] = train['points_x'].copy() - train['points_y'].copy()
 
-  train = train.drop(columns=['DayOfSeason_y','at_home_y','points_x','points_y','game_id'])
+  train_tot['target'] = train_tot['points_x'].copy() + train['points_y'].copy()
+
+
+  train_df = train.drop(columns=['DayOfSeason_y','at_home_y','points_x','points_y','game_id'])
   print("ready to train")
-  train.to_csv('output/train_test.csv')
+  train_df.to_csv('output/train_test.csv')
+  train_tot = train.drop(columns=['DayOfSeason_y','at_home_y','points_x','points_y','game_id'])
+
+  train_tot.to_csv('output/train_tot.csv')
   return train
 
 

@@ -51,6 +51,13 @@ def change_col_names(df):
   
   return df
 
+def fix_rolling(df):
+  _df = df[['game_id','home_rolling','away_rolling']].groupby(['game_id']).sum()
+  df= df.set_index('game_id')
+  df = df.drop(columns=['home_rolling','away_rolling'])
+  df = df.join(_df,on='game_id')
+  df = df.reset_index()
+  return df
 
   
 #game Ids
@@ -68,11 +75,7 @@ def add_ids(df):
     
 #     old = len(df)
   #transfer rolling games to all boxscores
-  _df = df[['game_id','home_rolling','away_rolling']].groupby(['game_id']).sum()
-  df= df.set_index('game_id')
-  df = df.drop(columns=['home_rolling','away_rolling'])
-  df = df.join(_df,on='game_id')
-  df = df.reset_index()
+  df = fix_rolling(df)
 
 
 

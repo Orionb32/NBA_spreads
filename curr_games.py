@@ -2,10 +2,13 @@ from sportsreference.nba.teams import Teams
 from sportsreference.nba.boxscore import Boxscore
 import pandas as pd
 from datetime import datetime, timedelta
-import tri_code_dict
+import tri_code_dict 
 import nba_scrape
+import feature_creation
 import get_info
 from tqdm import tqdm
+import numpy as np
+import model
 
 def main():
 	try:
@@ -20,14 +23,51 @@ def main():
 
 	date_str = get_formatted_date()
 	todays_games = schedule_df[schedule_df['BoxscoreIndex'].str.contains(date_str)==True]
-	return todays_games
-	print (todays_games)
+	
+	today,layout = fill_box(todays_games)
+
+	#print(layout[['team_x','team_y']])
+	prediction,prediction2 = predict(today)
+
+	layout['ProjDiff'] = prediction
+	layout['ProjTot'] = prediction2
+
+	print(layout[['team_x','ProjDiff','team_y','ProjTot']])
+
+
+
+def predict(today):
+	#drop the excess
+	path = 'output/train.csv'
+	path_tot = 'output/train_tot.csv'
+	
+	model_lgb,X,y,train = model.train(path)
+	train = train.drop(columns=['Unnamed: 0','target'])
+	X = X.drop(columns = ['Unnamed: 0'])
+	model_lgb.fit(X, y)
+	train_prediction = model_lgb.predict(train)
+
+	model_lgb2 , X2,y2, train_tot = model.train(path_tot)
+	train_tot  = train_tot.drop(columns=['Unnamed: 0','target'])
+	X2= X2.drop(columns = ['Unnamed: 0'])
+	model_lgb2.fit(X2, y2)
+	train_prediction_tot = model_lgb2.predict(train_tot)
+
+
+
+	today1 = today.drop(columns=['date_x','Season_x','BoxscoreIndex','HomeTeam_x','home_loc_x','date_y','Season_y','TeamName','DayOfSeason_y','HomeTeam_y','team_y','id_y','home_loc_y'])
+	today1 = today1.drop(columns=['team_x','id_x','Sea_PF_x','Sea_PF_y','Sea_FT_x','Sea_FT_y','Sea_TO_x','Sea_TO_y'])
+
+	prediction = model_lgb.predict(today1)
+	prediction2 = model_lgb2.predict(today1)
+	print(prediction)
+	return prediction, prediction2
 
 def fill_box(todays_games):
 	train, feats, df=feature_creation.main(range(2011,2021))
 	todays_games['season'] = todays_games['Season']
 	todays_games = get_info.add_dos(todays_games)
-	ctc = tcd.create_team_conversion()
+	ctc = tri_code_dict.create_team_conversion()
 	rev_ctc = dict([(value,key) for key, value in ctc.items()])
 	todays_games['HomeTeam'] = todays_games['BoxscoreIndex'].str[-3:].map(rev_ctc)
 
@@ -35,7 +75,8 @@ def fill_box(todays_games):
 	teams2 = todays_games.drop_duplicates(subset=['BoxscoreIndex'],keep='last')
 
 	teams1['at_home_x'] = np.where(teams1['TeamName'].copy()==teams1['HomeTeam'],1,0)
-	teams2['at_home_y'] = np.where(teams2['TeamName'].copy()==teams2['HomeTeam'],1,0)
+	#should only need one home location
+	#teams2['at_home_y'] = np.where(teams2['TeamName'].copy()==teams2['HomeTeam'],1,0)
 
 	teams1['team_x'] = teams1['TeamName']
 	teams1['rolling_x'] = teams1['rollingGames']
@@ -43,9 +84,13 @@ def fill_box(todays_games):
 	teams2['team_y'] = teams2['TeamName']
 	teams2['rolling_y'] = teams2['rollingGames']
 
-	teams1['id_x'] = teams1['id']
-	teams2['id_y'] = teams2['id']
+	teams1['id_x'] = teams1['Season'].astype(str) +teams1['team_x'].str.lower().str.replace(" ","")
+	teams2['id_y'] = teams2['Season'].astype(str) + teams2['team_y'].str.lower().str.replace(" ","")
 
+	teams1 = teams1.drop(columns=['season','rollingGames','season_start','TeamName'])
+	teams2 = teams2.drop(columns=['season','rollingGames','season_start'])
+
+	todays_games = teams1.merge(teams2,on='BoxscoreIndex')
 
 	#next steps
 	#set index to home team
@@ -54,15 +99,54 @@ def fill_box(todays_games):
 
 	feats = feats.drop_duplicates(subset=['id'],keep='last')
 	feats = feats.tail(30)
-	
-	todays_games['id'] = todays_games['Season'].astype(str)+todays_games['TeamName'].str.lower().str.replace(" ","")
+
+#taken care of above	
+#	todays_games['id'] = todays_games['Season'].astype(str)+todays_games['TeamName'].str.lower().str.replace(" ","")
 	
 	feats = feats.set_index('id')
 	
-	today_feats = feats.loc[todays_games['id']]
+	feats1 = feats.loc[teams1['id_x']]
+	feats2 = feats.loc[teams2['id_y']]
 
-	test = pd.DataFrame(columns=list(train))
-	test['DayOfSeason_x'] = todays_games['DayOfSeason']
+	feats1= feats1.reset_index()
+	feats2 = feats2.reset_index()
+	fncols_x =[]
+	fncols_y = []
+	fcols = list(feats1)
+	for col in fcols:
+		col +='_x'
+		fncols_x.append(col)
+	for col in fcols:
+		col+='_y'
+		fncols_y.append(col)
+
+	feats1[fncols_x] = feats1[fcols]
+	feats2[fncols_y] = feats2[fcols]
+
+	feats1 = feats1.drop(columns=fcols)
+	feats2 = feats2.drop(columns=fcols)
+
+	feats1 = feats1.set_index('id_x')
+	today_x = teams1.merge(feats1,on='id_x')
+
+	today_y = teams2.merge(feats2,on='id_y')
+
+	today = today_x.merge(today_y, on='BoxscoreIndex')
+
+	print(today)
+	print(list(today))
+	return today, todays_games
+
+	today = today.drop(columns=['date_x','date_y','Season_x','Season_y','DayOfSeason_y','BoxscoreIndex','HomeTeam_x','team_x','HomeTeam_y','team_y','home_loc_y','home_loc_x','TeamName'])
+
+	return today, todays_games
+
+
+
+#	today_feats = feats.loc[todays_games['id']]
+
+	#test = pd.DataFrame(columns=list(train))
+	#test['DayOfSeason_x'] = todays_games['DayOfSeason']
 
 
 
@@ -74,7 +158,7 @@ def update_games():
 	season = get_info.get_season()
 
 	#get the box score data already pulled
-	season_box = pd.read_csv('output/{}_boxscores_update_test.csv'.format(season))
+	season_box = pd.read_csv('output/{}_boxscores.csv'.format(season))
 	
 	#get the schedule df
 	schedule_df = pd.read_csv('output/schedule.csv')

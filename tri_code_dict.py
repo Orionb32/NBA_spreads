@@ -93,6 +93,43 @@ def create_arena_dict():
 
 
 
+def city_to_all():
+	cdict = dict({'SanAntonio':'San Antonio Spurs',
+		'GoldenState':'Golden State Warriors',
+		'LALakers':'Los Angeles Lakers',
+		'Toronto':'Toronto Raptors',
+		'Indiana':'Indiana Pacers',
+		'Orlando':'Orlando Magic',
+		'NewJersey':'Brooklyn Nets',
+		'Cleveland':'Cleveland Cavaliers',
+		'Memphis':'Memphis Grizzlies',
+		'NewOrleans':'New Orleans Pelicans',
+		'Denver':'Denver Nuggets',
+		'Miami':'Miami Heat',
+		'Utah':'Utah Jazz',
+		'Seattle':'Oklahoma City Thunder',
+		'Charlotte':'Charlotte Hornets',
+		'Atlanta':'Atlanta Hawks',
+		'Boston':'Boston Celtics',
+		'Minnesota':'Minnesota Timberwolves',
+		'Chicago':'Chicago Bulls',
+		'Phoenix':'Phoenix Suns',
+		'LAClippers':'Los Angeles Clippers',
+		'Philadelphia':'Philadelphia 76ers',
+		'Washington':'Washington Wizards',
+		'Milwaukee':'Milwaukee Bucks',
+		'Houston':'Houston Rockets',
+		'Dallas':'Dallas Mavericks',
+		'NewYork':'New York Knicks',
+		'Detroit':'Detroit Pistons',
+		'Sacramento':'Sacramento Kings',
+		'Portland':'Portland Trail Blazers',
+		})
+	return cdict
+
+
+
+
 
 
 
